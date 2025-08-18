@@ -1633,6 +1633,249 @@ from employees e join salaries s on e.emp_no = s.emp_no;
 
 select * from salaries_adjusted_for_inflation;
 
+select year(from_date) as calendar_year, gender, count(e.emp_no) num_of_employees from t_employees e
+join t_dept_emp t on t.emp_no = e.emp_no and year(from_date) >= 1990
+group by calendar_year, 2;
+# order by 1;
+
+select d.dept_name, e.gender, dm.emp_no, dm.from_date, dm.to_date, years.calendar_year,
+case when year(e.hire_date) between year(from_date) and year(to_date) then 1 else 0 end as active 
+FROM
+    (SELECT DISTINCT YEAR(hire_date) AS calendar_year FROM t_employees) years
+CROSS JOIN t_dept_manager dm
+JOIN t_employees e ON e.emp_no = dm.emp_no
+JOIN t_departments d ON dm.dept_no = d.dept_no
+order by calendar_year, gender, dept_name, emp_no;
+
+SELECT 
+    a.dept_name,
+    a.gender,
+    a.emp_no,
+    a.from_date,
+    a.to_date,
+    CASE
+        WHEN a.to_date > '2024-01-01' THEN 1
+        ELSE 0
+    END AS currently_active
+FROM
+    (SELECT 
+    d.dept_name, e.gender, e.emp_no, dm.from_date, dm.to_date
+    FROM
+        employees e
+        CROSS JOIN
+    dept_manager dm
+        JOIN
+    departments d ON dm.dept_no = d.dept_no
+        JOIN 
+    employees ee ON dm.emp_no = ee.emp_no) a
+ORDER BY emp_no DESC;
+
+select gender, d.dept_name, round(avg(salary), 2) as salary, year(de.from_date) as calendar_year 
+from t_salaries s 
+join t_employees e on s.emp_no = e.emp_no
+join t_dept_emp de on de.emp_no = e.emp_no
+join t_departments d on de.dept_no = d.dept_no
+where de.from_date between '1990-01-01' and '2002-01-01' 
+group by d.dept_no, 1, 4
+order by d.dept_no;
+
+select e.gender, d.dept_name, round(avg(salary), 2) avg_salary, 
+case when de.from_date < '1998-01-01' then 'before' else 'on or after' end as jan_1_1998
+from employees e
+join salaries s on s.emp_no = e.emp_no
+join dept_emp de on de.emp_no = e.emp_no
+join departments d on d.dept_no = de.dept_no
+where year(de.from_date) >= 1990
+group by d.dept_no, e.gender, 3
+order by d.dept_no;
+
+delimiter $$
+create procedure func(in salary1 double, salary2 double)
+begin
+	select round(avg(s.salary), 2) salary, e.gender, d.dept_name
+    from salaries s join employees e on s.emp_no = e.emp_no
+    join dept_emp de on de.emp_no = e.emp_no 
+    join departments d on d.dept_no = de.dept_no
+    where s.salary between salary1 and salary2
+    group by dept_name, gender;
+end $$
+delimiter ;
+
+call func(50000, 60000);
+
+/* ============================= */
+
+# Exercise 1
+# Find the average salary of the male and female employees in each department
+select gender, dept_name, round(avg(salary), 2) avarage_salary
+from salaries s 
+join dept_emp de on s.emp_no = de.emp_no
+join departments d on d.dept_no = de.dept_no
+join employees e on e.emp_no = de.emp_no
+group by dept_name, gender
+order by d.dept_no;
+
+# Exercise 2
+# Find the lowest department number encountered in the 'dept_emp' table. 
+# Then, find the highest department number. 
+select min(dept_no), max(dept_no) from dept_emp;
+
+/* Exercise 3
+Obtain a table containing the following three fields for all individuals whose employee number is not
+greater than 10040:
+- employee number
+- the lowest department number among the departments where the employee has worked in (Hint: use
+a subquery to retrieve this value from the 'dept_emp' table)
+- assign '110022' as 'manager' to all individuals whose employee number is lower than or equal to 10020,
+and '110039' to those whose number is between 10021 and 10040 inclusive.
+Use a CASE statement to create the third field.
+If you've worked correctly, you should obtain an output containing 40 rows. */
+
+select de.emp_no, min(d.dept_no) dept_no,
+case when de.emp_no <= 10020 then 110022
+	 when de.emp_no between 10021 and 10040 then 110039
+end as manager
+from departments d
+join dept_emp de on de.dept_no = d.dept_no
+join employees e on e.emp_no = de.emp_no
+where de.emp_no <= 10040
+group by de.emp_no;
+
+# Exercise 4
+# Retrieve a list of all employees that have been hired in 2000.
+select * from employees where year(hire_date) = 2000;
+
+/* Exercise 5
+Retrieve a list of all employees from the ‘titles’ table who are engineers.
+Repeat the exercise, this time retrieving a list of all employees from the ‘titles’ table who are senior
+engineers.
+After LIKE, you could indicate what you are looking for with or without using parentheses. Both options are
+correct and will deliver the same output. We think using parentheses is better for legibility and that’s why
+it is the first option we’ve suggested.*/
+select * from titles
+where title = 'Senior Engineer';
+
+
+/* Exercise 6
+Create a procedure that asks you to insert an employee number and that will obtain an output containing
+the same number, as well as the number and name of the last department the employee has worked in.
+Finally, call the procedure for employee number 10010.
+If you've worked correctly, you should see that employee number 10010 has worked for department
+number 6 - "Quality Management".*/
+delimiter $$
+create procedure func2(in p_emp_no int)
+begin 
+select de.emp_no, d.dept_no, d.dept_name from dept_emp de
+join departments d on d.dept_no = de.dept_no
+where de.emp_no = p_emp_no
+order by de.to_date DESC
+limit 1;
+end $$
+delimiter ;
+DROP PROCEDURE IF EXISTS func2;
+call func2(10200);
+
+/* Exercise 7
+How many contracts have been registered in the ‘salaries’ table with duration of more than one year and
+of value higher than or equal to $100,000?
+Hint: You may wish to compare the difference between the start and end date of the salaries contracts.*/
+select count(*) from salaries
+where datediff(to_date, from_date) > 365
+and salary >= 100000;
+
+/* Exercise 8
+Create a trigger that checks if the hire date of an employee is higher than the current date. If true, set the
+hire date to equal the current date. Format the output appropriately (YY-mm-dd).
+Extra challenge: You can try to declare a new variable called 'today' which stores today's data, and then
+use it in your trigger!
+After creating the trigger, execute the following code to see if it's working properly.*/
+delimiter $$
+create trigger trig_1
+before insert on employees
+for each row  
+begin  
+	declare today date;
+    select date_format(sysdate(), '%Y-%m-%d') into today;
+    if new.hire_date > today then     
+        set new.hire_date = today;     
+    end if;  
+end $$
+delimiter ;
+
+/* Exercise 9
+Define a function that retrieves the largest contract salary value of an employee. Apply it to employee
+number 11356.
+In addition, what is the lowest contract salary value of the same employee? You may want to create a new
+function that to obtain the result.*/
+delimiter $$
+create function employees.max_salary(p_emp_no int) returns decimal(10, 2)
+begin 
+declare result decimal(10, 2);
+select max(salary) into result from salaries s
+join employees e on e.emp_no = s.emp_no
+where e.emp_no = p_emp_no;
+return result;
+end$$
+delimiter ;
+
+select max_salary(11356);
+
+/* Exercise 10
+Based on the previous exercise, you can now try to create a third function that also accepts a second
+parameter. Let this parameter be a character sequence. Evaluate if its value is 'min' or 'max' and based on
+that retrieve either the lowest or the highest salary, respectively (using the same logic and code structure
+from Exercise 9). If the inserted value is any string value different from ‘min’ or ‘max’, let the function
+return the difference between the highest and the lowest salary of that employee. */
+delimiter $$
+create function max_min(p_emp_no int, min_max char(10)) returns decimal(10, 2)
+begin 
+declare result decimal(10, 2);
+select 
+case when min_max = 'min' then min(salary)
+else max(salary) end as min_max into result from salaries s
+join employees e on e.emp_no = s.emp_no
+where e.emp_no = p_emp_no;
+return result;
+end$$
+delimiter ;
+
+select max_min(11356, 'min');
+
+select d.dept_name, e.gender, avg(s.salary) avg_salary
+from salaries s 
+join employees e on e.emp_no = s.emp_no
+join dept_emp de on de.emp_no = s.emp_no
+join departments d on d.dept_no = de.dept_no
+group by d.dept_name, e.gender
+having avg_salary > 70000
+order by d.dept_no;
+
+select de.emp_no, min(de.dept_no) dept_no, 
+case 
+	when de.emp_no between 10001 and 10005 then 10006
+	when de.emp_no not between 10001 and 10005 then 10007 end as manager_no
+from dept_emp de
+where de.emp_no <= 10008
+group by de.emp_no;
+
+select * from employees 
+where hire_date between '1998-01-01' and '1992-12-31';
+
+select emp_no, title, from_date, to_date from titles
+where title LIKE '%staff%';
+
+select count(*) as num_open_ended_contracts from salaries s
+where salary > 74057 and s.to_date = '9999-01-01'
+
+
+
+
+
+
+
+
+
+
 
 
 
