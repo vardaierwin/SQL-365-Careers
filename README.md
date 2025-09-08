@@ -1,4 +1,4 @@
-# 📘 Extended Description (English)
+# 📘 Extended Description 
 ## 🏢 Database Purpose & Structure
 This database models an employee management system for a fictional company. It tracks employee details, salaries, job titles, department assignments, and managerial roles over time. The queries demonstrate a comprehensive range of SQL concepts: from basic data retrieval to advanced analytical techniques like **window functions, CTEs, subqueries, joins, aggregates, stored procedures, functions, triggers, indexes, views, and temporal data handling**.
 
